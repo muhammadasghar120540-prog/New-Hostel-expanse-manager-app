@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hostel Expense Pro v5.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --sidebar-w: 75px; --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --bg: #f4f7f6; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); overflow: hidden; }
+        .sidebar { width: var(--sidebar-w); background: var(--primary); color: white; display: flex; flex-direction: column; align-items: center; padding-top: 15px; flex-shrink: 0; }
+        .nav-item { width: 100%; padding: 15px 5px; text-align: center; cursor: pointer; font-size: 11px; color: #bdc3c7; border-left: 3px solid transparent; }
+        .nav-item.active { background: #34495e; color: white; border-left-color: var(--accent); }
+        .nav-item i { display: block; font-size: 22px; margin-bottom: 4px; }
+        .main-content { flex-grow: 1; overflow-y: auto; padding: 15px; }
+        .page { display: none; max-width: 900px; margin: 0 auto; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .card.expense-card { border-top: 5px solid var(--danger); }
+        .card.collection-card { border-top: 5px solid var(--success); }
+        h2, h3 { margin-top: 0; color: var(--primary); }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0; border-radius: 6px; border: 1px solid #ddd; }
+        button { background: var(--accent); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-danger { background: var(--danger); }
+        .btn-success { background: var(--success); }
+        .btn-edit { background: #3498db; }
+        .balance-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+        .val-pos { color: var(--success); font-weight: bold; }
+        .val-neg { color: var(--danger); font-weight: bold; }
+        .account-card { background: var(--primary); color: white; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th, td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #eee; }
+        .action-btns { display: flex; gap: 4px; justify-content: center; }
+        label.section-label { font-size: 12px; font-weight: bold; color: #7f8c8d; display: block; margin-top: 10px; }
+        
+        /* Toggle Switch Styling */
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        /* Modal Overlay Styling for Advanced Edit */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="nav-item active" onclick="showPage('entryPage', this)"><i>📝</i>Entry</div>
+        <div class="nav-item" onclick="showPage('recordsPage', this)"><i>📜</i>Records</div>
+        <div class="nav-item" onclick="showPage('userPage', this)"><i>📊</i>Analysis</div>
+        <div class="nav-item" onclick="showPage('sharePage', this)"><i>🔗</i>Share</div>
+        <div class="nav-item" onclick="showPage('archivePage', this)"><i>⚙️</i>Settings</div>
+    </div>
+
+    <div class="main-content">
+        <div id="entryPage" class="page" style="display:block">
+            <h3>💸 Add Daily Expense</h3>
+            <div class="card expense-card">
+                <input id="expDesc" placeholder="Expense Description (e.g. Dinner, Sabzi)">
+                <input id="expAmt" type="number" placeholder="Amount (Rs.)">
+                <input id="expDate" type="date">
+                <label class="section-label">Paid By:</label>
+                <select id="expPayer"></select>
+                <label class="section-label">Include Members in this expense:</label>
+                <div id="expMemberChecks" style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top:5px;"></div>
+                <button class="btn-danger" onclick="addEntry('expense')">Save Expense Record</button>
+            </div>
+
+            <hr style="border:0; border-top:1px dashed #ccc; margin: 25px 0;">
+
+            <h3>💰 Member Collection (Fund Jama)</h3>
+            <div class="card collection-card">
+                <input id="colDesc" placeholder="Collection Description (e.g. April Mess Fund)">
+                <input id="colAmt" type="number" placeholder="Amount (Rs.)">
+                <input id="colDate" type="date">
+                <label class="section-label">Member Submitting Money:</label>
+                <select id="colPayer"></select>
+                <button class="btn-success" onclick="addEntry('collection')">Add Collection Record</button>
+            </div>
+        </div>
+
+        <div id="recordsPage" class="page">
+            <h2>Financial Records</h2>
+            <div class="card" style="overflow-x:auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Item</th>
+                            <th>Total</th>
+                            <th>Per Head</th>
+                            <th>By</th>
+                            <th>Members</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="userPage" class="page">
+            <div class="account-card">
+                <div style="font-size: 12px; opacity: 0.8;">Common Account Balance</div>
+                <div id="commonBalance" style="font-size: 24px; font-weight: bold;">Rs. 0</div>
+            </div>
+            <div class="card" style="overflow-x:auto">
+                <h3>Member Balance Sheet</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Member Name</th>
+                            <th>Previous Balance<br><small>(Last Share)</small></th>
+                            <th>Current Net Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analysisTableBody"></tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h3>Expense Consumption</h3>
+                <canvas id="expenseChart"></canvas>
+            </div>
+        </div>
+
+        <div id="sharePage" class="page">
+            <h2>Share Reports</h2>
+            <div class="card">
+                <button class="btn-success" onclick="shareToday()">Share Today Summary</button>
+                <hr>
+                <select id="shareMemberSelect"></select>
+                <button onclick="shareIndividual()">Share Member Record</button>
+            </div>
+        </div>
+
+        <div id="archivePage" class="page">
+            <h2>Settings & Archive</h2>
+            <div class="card">
+                <h3>Manage Members & Mess Status (ON/OFF)</h3>
+                <div id="manageMembersList"></div>
+                <div style="display:flex; gap:5px; margin-top: 15px;">
+                    <input id="newMemberName" placeholder="New Member Name">
+                    <button style="width:80px" onclick="addMember()">Add</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>History Archive</h3>
+                <button class="btn-danger" onclick="archiveData()">Archive Current Data</button>
+                <div id="archiveHistory"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom:10px;">✏️ Edit Complete Record</h3>
+            <input id="editId" type="hidden">
+            <input id="editType" type="hidden">
+            
+            <label class="section-label">Description:</label>
+            <input id="editDesc">
+            
+            <label class="section-label">Amount (Rs.):</label>
+            <input id="editAmt" type="number">
+            
+            <label class="section-label">Date:</label>
+            <input id="editDate" type="date">
+            
+            <label class="section-label">Paid By:</label>
+            <select id="editPayer"></select>
+            
+            <div id="editMembersSection">
+                <label class="section-label">Included Members:</label>
+                <div id="editMemberChecks" style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top:5px;"></div>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-success" onclick="saveGlobalEdit()">Update Record</button>
+                <button class="btn-danger" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let members = JSON.parse(localStorage.getItem("members") || '["Ali", "Asghar"]');
+        let records = JSON.parse(localStorage.getItem("records") || "[]");
+        let archives = JSON.parse(localStorage.getItem("archives") || "[]");
+        // Maintain active/inactive mess status per member
+        let messStatus = JSON.parse(localStorage.getItem("messStatus") || "{}");
+
+        // Set default status to true (ON) if not defined
+        members.forEach(m => { if(messStatus[m] === undefined) messStatus[m] = true; });
+
+        function save() {
+            localStorage.setItem("records", JSON.stringify(records));
+            localStorage.setItem("members", JSON.stringify(members));
+            localStorage.setItem("archives", JSON.stringify(archives));
+            localStorage.setItem("messStatus", JSON.stringify(messStatus));
+        }
+
+        function addEntry(type) {
+            let desc, amt, date, payer, included;
+
+            if(type === 'expense') {
+                desc = document.getElementById("expDesc").value;
+                amt = Number(document.getElementById("expAmt").value);
+                date = document.getElementById("expDate").value;
+                payer = document.getElementById("expPayer").value;
+                included = [...document.querySelectorAll("#expMemberChecks input:checked")].map(i => i.value);
+                if(!desc || !amt || !date || included.length === 0) return alert("Please fill all expense details.");
+            } else {
+                desc = document.getElementById("colDesc").value;
+                amt = Number(document.getElementById("colAmt").value);
+                date = document.getElementById("colDate").value;
+                payer = document.getElementById("colPayer").value;
+                included = []; 
+                if(!desc || !amt || !date) return alert("Please fill all collection details.");
+            }
+
+            records.push({ id: Date.now().toString(), date, desc, type, amount: amt, paidBy: payer, members: included });
+            save(); location.reload(); 
+        }
+
+        function renderRecords() {
+            let html = "";
+            records.slice().reverse().forEach(r => {
+                const perHead = (r.type === 'expense' && r.members.length > 0) ? (r.amount / r.members.length).toFixed(0) : "-";
+                const typeIcon = r.type === 'expense' ? '💸' : '💰';
+                html += `<tr>
+                    <td>${r.date.split('-').slice(1).join('/')}</td>
+                    <td>${typeIcon}</td>
+                    <td>${r.desc}</td>
+                    <td>${r.amount}</td>
+                    <td>${perHead}</td>
+                    <td>${r.paidBy === "Common" ? "🏦" : r.paidBy}</td>
+                    <td style="font-size:9px; color:#555;">${r.type==='expense'? r.members.join(", ") : "-"}</td>
+                    <td>
+                        <div class="action-btns">
+                            <button class="btn-edit" style="width:auto; padding:4px 8px; font-size:10px" onclick="openEditModal('${r.id}')">Edit</button>
+                            <button class="btn-danger" style="width:auto; padding:4px 8px; font-size:10px" onclick="deleteRec('${r.id}')">Del</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById("recordsBody").innerHTML = html;
+        }
+
+        function calculateBalances() {
+            let stats = { consumed: {}, paid: {}, balance: {}, previous: {}, common: 0 };
+            members.forEach(m => { stats.consumed[m] = 0; stats.paid[m] = 0; stats.balance[m] = 0; stats.previous[m] = 0; });
+
+            // Extract last historical archived net balance as 'Previous Balance' if available
+            if(archives.length > 0) {
+                let lastArchive = archives[archives.length - 1];
+                if(lastArchive.balancesAtArchive) {
+                    members.forEach(m => {
+                        stats.previous[m] = lastArchive.balancesAtArchive[m] || 0;
+                    });
+                }
+            }
+
+            records.forEach(r => {
+                if(r.type === 'expense') {
+                    let share = r.members.length > 0 ? r.amount / r.members.length : 0;
+                    r.members.forEach(m => {
+                        stats.consumed[m] += share;
+                        stats.balance[m] -= share;
+                    });
+                    if(r.paidBy === "Common") {
+                        stats.common -= r.amount;
+                    } else {
+                        stats.paid[r.paidBy] += r.amount;
+                        stats.balance[r.paidBy] += r.amount;
+                    }
+                } else { 
+                    if(r.paidBy !== "Common") {
+                        stats.paid[r.paidBy] += r.amount;
+                        stats.balance[r.paidBy] += r.amount; 
+                    }
+                    stats.common += r.amount;
+                }
+            });
+            return stats;
+        }
+
+        // --- GLOBAL ADVANCED EDIT LOGIC ---
+        function openEditModal(id) {
+            let rec = records.find(r => r.id === id);
+            if(!rec) return;
+
+            document.getElementById("editId").value = rec.id;
+            document.getElementById("editType").value = rec.type;
+            document.getElementById("editDesc").value = rec.desc;
+            document.getElementById("editAmt").value = rec.amount;
+            document.getElementById("editDate").value = rec.date;
+
+            // Setup payer dropdown choices inside Modal
+            const mOptions = members.map(m => `<option value="${m}">${m}</option>`).join("");
+            const commonOption = `<option value="Common">Common Fund Account</option>`;
+            let editPayerDropdown = document.getElementById("editPayer");
+            editPayerDropdown.innerHTML = rec.type === 'expense' ? (commonOption + mOptions) : (mOptions + commonOption);
+            editPayerDropdown.value = rec.paidBy;
+
+            // Setup members inclusion checklists if type is expense
+            let memberChecksDiv = document.getElementById("editMemberChecks");
+            let membersSection = document.getElementById("editMembersSection");
+            
+            if(rec.type === 'expense') {
+                membersSection.style.display = "block";
+                memberChecksDiv.innerHTML = members.map(m => `
+                    <label><input type="checkbox" value="${m}" ${rec.members.includes(m) ? 'checked' : ''}> ${m}</label>
+                `).join("");
+            } else {
+                membersSection.style.display = "none";
+            }
+
+            document.getElementById("editModal").style.display = "flex";
+        }
+
+        function closeEditModal() {
+            document.getElementById("editModal").style.display = "none";
+        }
+
+        function saveGlobalEdit() {
+            let id = document.getElementById("editId").value;
+            let rec = records.find(r => r.id === id);
+            if(!rec) return;
+
+            let amt = Number(document.getElementById("editAmt").value);
+            let desc = document.getElementById("editDesc").value;
+            let date = document.getElementById("editDate").value;
+            let payer = document.getElementById("editPayer").value;
+
+            if(!desc || !amt || !date) return alert("Please fill all visible inputs.");
+
+            rec.desc = desc;
+            rec.amount = amt;
+            rec.date = date;
+            rec.paidBy = payer;
+
+            if(rec.type === 'expense') {
+                let checkedMembers = [...document.querySelectorAll("#editMemberChecks input:checked")].map(i => i.value);
+                if(checkedMembers.length === 0) return alert("Select at least 1 member for the expense.");
+                rec.members = checkedMembers;
+            }
+
+            save(); 
+            closeEditModal();
+            location.reload();
+        }
+        // ----------------------------------
+
+        function deleteRec(id) { if(confirm("Are you sure to delete this record?")) { records = records.filter(r => r.id !== id); save(); location.reload(); } }
+
+        function renderAnalysis() {
+            const data = calculateBalances();
+            document.getElementById("commonBalance").innerText = `Rs. ${data.common.toFixed(0)}`;
+            
+            let html = "";
+            members.forEach(m => {
+                const prev = data.previous[m];
+                const bal = data.balance[m];
+                html += `<tr>
+                    <td style="font-weight:600; text-align:left; padding-left:15px;">${m}</td>
+                    <td class="${prev>=0?'val-pos':'val-neg'}">Rs. ${prev.toFixed(0)}</td>
+                    <td class="${bal>=0?'val-pos':'val-neg'}">Rs. ${bal.toFixed(0)}</td>
+                </tr>`;
+            });
+            document.getElementById("analysisTableBody").innerHTML = html;
+
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            if(window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: members,
+                    datasets: [{ data: members.map(m => data.consumed[m]), backgroundColor: ['#e74c3c', '#3498db', '#27ae60', '#f1c40f', '#9b59b6', '#e67e22'] }]
+                }
+            });
+        }
+
+        function showPage(id, el) {
+            document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+            document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+            document.getElementById(id).style.display = "block"; el.classList.add("active");
+            if(id === 'userPage') renderAnalysis();
+            if(id === 'archivePage') renderSettingsAndArchives();
+        }
+
+        // Toggle Mess Status ON/OFF
+        
